@@ -15,7 +15,7 @@ type Order_items struct {
 	gorm.Model
 	Quantity int   `gorm:"not null;default:1"`
 	OrderID  uint  `gorm:"column:order_id;not null"`
-	Order    Order `gorm:"foreignKey:OrderID"`
 	DishID   uint  `gorm:"column:dish_id;not null"`
 	Dish     Dish  `gorm:"foreignKey:DishID"`
+	Order    Order `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE"`
 }

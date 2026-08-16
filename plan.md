@@ -61,7 +61,9 @@
 
 - [ ] API route
 
-1. get menu: `GET /api/menu`
+- [ ] add ratelimit 
+
+- [x] get menu: `GET /api/menu`
     ```text
         response
         {
@@ -71,7 +73,7 @@
             Is_available
         }
    ```
-2. upload slip: `POST /api/payments/slip`
+- [ ] upload slip: `POST /api/payments/slip`
     ```text
         response
         {
