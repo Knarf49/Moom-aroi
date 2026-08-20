@@ -1,4 +1,4 @@
-package gorm
+package utils
 
 import (
 	models "server/schema"

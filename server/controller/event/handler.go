@@ -2,10 +2,12 @@ package wsevents
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	models "server/schema"
 
 	"github.com/gofiber/contrib/v3/websocket/event"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +18,7 @@ func emit(ep *event.EventPayload, msg []byte) {
 }
 
 type createOrderPayload struct {
-	TableID uint `json:"tableId"`
+	TableID uuid.UUID `json:"tableId"`
 }
 
 // payload : {MenuId: quantity, MenuId: quantity,.... }
@@ -26,9 +28,25 @@ func Create_order(db *gorm.DB, ep *event.EventPayload) {
 		emit(ep, []byte(`{"error":"invalid create_order payload"}`))
 		return
 	}
+	var existingOrder models.Order
+	queryErr := db.Where("table_id = ? AND status = ?", payload.TableID, "pending").First(&existingOrder).Error
+	if queryErr == nil {
+		log.Printf("create order failed because can't have 2 orders with same table in the same time")
+		errMsg, _ := json.Marshal(map[string]any{
+			"event": "create_order",
+			"error": "Can't have duplicate active orders in the same table.",
+		})
+		emit(ep, errMsg)
+		return
+	}
+	if !errors.Is(queryErr, gorm.ErrRecordNotFound) {
+		log.Printf("failed to check existing order for table=%s: %v", payload.TableID, queryErr)
+		emit(ep, []byte(`{"event":"create_order","error":"failed to check existing orders"}`))
+		return
+	}
 	newOrder := models.Order{TableID: payload.TableID}
 	if err := db.Create(&newOrder).Error; err != nil {
-		log.Printf("create order failed for table=%d: %v", payload.TableID, err)
+		log.Printf("create order failed for table=%s: %v", payload.TableID, err)
 		errMsg, _ := json.Marshal(map[string]any{
 			"event": "create_order",
 			"error": "failed to create order",
@@ -46,11 +64,10 @@ func Create_order(db *gorm.DB, ep *event.EventPayload) {
 
 type OrderFoodPayload struct {
 	OrderMap map[uint]int `json:"orderMap"`
-	TableID  uint         `json:"tableId"`
+	TableID  uuid.UUID    `json:"tableId"`
 	OrderID  uint         `json:"orderId"`
 }
 
-// TODO: add error handler to functions below
 // tx = db ที่เก็บชั่วคราวตอน query ก่อนที่จะเก็บถาวรตอนทุกอย่างสำเร็จ ไม่มี error
 func Order_food(db *gorm.DB, ep *event.EventPayload) {
 	var payload OrderFoodPayload
@@ -86,34 +103,6 @@ func Order_food(db *gorm.DB, ep *event.EventPayload) {
 		"event":   "order_food",
 		"status":  "received",
 		"orderId": payload.OrderID,
-	})
-	emit(ep, ack)
-}
-
-type DeleteOrderPayload struct {
-	Order models.Order `json:"order"`
-}
-
-func Delete_order(db *gorm.DB, ep *event.EventPayload) {
-	var payload DeleteOrderPayload
-
-	if err := json.Unmarshal(ep.Data, &payload); err != nil {
-		emit(ep, []byte(`{"error":"invalid delete_order payload"}`))
-		return
-	}
-
-	if err := db.Unscoped().Delete(&payload.Order).Error; err != nil {
-		ack, _ := json.Marshal(map[string]any{
-			"event":  "delete_order",
-			"status": "failed to delete order",
-		})
-		emit(ep, ack)
-		return
-	}
-
-	ack, _ := json.Marshal(map[string]any{
-		"event":  "delete_order",
-		"status": "deleted",
 	})
 	emit(ep, ack)
 }

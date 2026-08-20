@@ -2,12 +2,13 @@ package models
 
 import (
 	"gorm.io/gorm"
+	"github.com/google/uuid"
 )
 
 type Order struct {
 	gorm.Model
-	Status  string `gorm:"default:pending"` //'pending', 'preparing', 'completed'
-	TableID uint   `gorm:"column:table_id;not null"`
+	Status  string `gorm:"default:pending"` //'pending', 'completed'
+	TableID uuid.UUID   `gorm:"column:table_id;not null"`
 	Table   Table  `gorm:"foreignKey:TableID"`
 }
 
